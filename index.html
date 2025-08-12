@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>경동택배 · 정기화물 운임 계산기</title>
+  <style>
+    :root{--bg:#0b0f14;--panel:#111723;--muted:#7f8aa5;--text:#e8eef6;--brand:#4cc9f0;--accent:#80ffdb;--danger:#ff6b6b}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Pretendard,Apple SD Gothic Neo,Noto Sans KR,sans-serif;background:linear-gradient(180deg,#0b0f14,#0d1320 40%,#0b0f14);color:var(--text)}
+
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:clamp(18px,2.8vw,28px);margin:0;letter-spacing:-0.3px}
+    .badge{font-size:12px;color:#0b0f14;background:var(--accent);padding:6px 10px;border-radius:999px;font-weight:700}
+
+    .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+    .card{background:rgba(255,255,255,0.04);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden}
+    .card h2{margin:0;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:16px;color:#cfe4ff}
+    .card .body{padding:16px}
+
+    .form{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+    .form label{font-size:12px;color:var(--muted)}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field input,.field select{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:#0f1624;color:var(--text)}
+    .field input::placeholder{color:#7e8aa1}
+
+    .span-2{grid-column:span 2}.span-3{grid-column:span 3}.span-6{grid-column:span 6}
+    @media (max-width:900px){.span-3{grid-column:span 3}.span-2{grid-column:span 3}.span-6{grid-column:span 6}}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    button{appearance:none;border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer}
+    .primary{background:linear-gradient(135deg,var(--brand),#5ef1e6);color:#001018}
+    .ghost{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.16)}
+    .switch{display:flex;align-items:center;gap:8px}
+
+    .results{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:720px){.results{grid-template-columns:1fr}}
+    .kpi{background:#0d1422;border:1px dashed rgba(255,255,255,0.12);border-radius:14px;padding:14px}
+    .kpi .label{font-size:12px;color:#9db0c9}
+    .kpi .value{font-size:clamp(18px,3.2vw,28px);font-weight:800;margin-top:2px}
+
+    .table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    .table th{font-size:12px;color:#9db0c9;text-align:left;padding:0 10px}
+    .row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:10px;align-items:center;background:#0e1523;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px}
+    @media (max-width:720px){.row{grid-template-columns:1fr 1fr;gap:8px}}
+    .tag{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#b9c7dc}
+    .ok{background:rgba(128,255,219,0.12);border-color:rgba(128,255,219,0.3);color:#d6fff6}
+
+    footer{margin-top:18px;color:#7f91ab;font-size:12px}
+    .muted{color:#8fa1bb}
+
+    /* 표 섹션 */
+    .sheet{margin-top:18px}
+    details{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:10px}
+    details+details{margin-top:10px}
+    summary{cursor:pointer;list-style:none;font-weight:700;color:#d6e6ff}
+    summary::-webkit-details-marker{display:none}
+    .scroll{overflow:auto;max-height:360px;border-top:1px dashed rgba(255,255,255,0.12);margin-top:8px;padding-top:8px}
+    table.rate{width:100%;border-collapse:collapse}
+    .rate th,.rate td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:right}
+    .rate th:first-child,.rate td:first-child{text-align:left}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>경동택배 · 정기화물 운임 계산기</h1>
+      <span class="badge">간편 모드 + 요금표 요약</span>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>입력</h2>
+        <div class="body">
+          <div class="form">
+            <div class="field span-6 switch">
+              <input type="checkbox" id="easy" />
+              <label for="easy"><strong>간편 모드</strong> (권역 가산율 자동 선택)</label>
+            </div>
+
+            <div class="field span-2">
+              <label>가로(cm)</label>
+              <input type="number" id="w" placeholder="예: 40" min="0" step="0.1" />
+            </div>
+            <div class="field span-2">
+              <label>세로(cm)</label>
+              <input type="number" id="l" placeholder="예: 40" min="0" step="0.1" />
+            </div>
+            <div class="field span-2">
+              <label>높이(cm)</label>
+              <input type="number" id="h" placeholder="예: 40" min="0" step="0.1" />
+            </div>
+
+            <div class="field span-3">
+              <label>총 중량(kg)</label>
+              <input type="number" id="kg" placeholder="예: 60" min="0" step="0.1" />
+            </div>
+            <div class="field span-3" id="distWrap">
+              <label>거리 가산(%) · 택배에만 적용</label>
+              <input type="number" id="dist" placeholder="예: 25 (수도권→경남)" min="0" step="1" />
+            </div>
+
+            <div class="field span-6" id="routeWrap" style="display:none">
+              <label>권역 선택(예시용 간편 가산율)</label>
+              <select id="route">
+                <option value="">권역 선택</option>
+                <option value="0">수도권↔수도권 (0%)</option>
+                <option value="10">수도권↔강원(일부) (10%)</option>
+                <option value="15">수도권↔강원(일부) (15%)</option>
+                <option value="20">수도권↔전라(일부) (20%)</option>
+                <option value="25">수도권↔경상 (25%)</option>
+                <option value="JEJU">제주(해상/별도)</option>
+              </select>
+            </div>
+
+            <div class="field span-6">
+              <label>대형화물 기준(참고)</label>
+              <div class="actions">
+                <span class="tag" id="t1">한 변 ≥ 100cm</span>
+                <span class="tag" id="t2">세 변 합 ≥ 160cm</span>
+                <span class="tag" id="t3">무게 ≥ 25kg</span>
+              </div>
+            </div>
+
+            <div class="field span-6">
+              <div class="actions">
+                <button class="primary" id="calcBtn">계산하기</button>
+                <button class="ghost" id="resetBtn">초기화</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>결과</h2>
+        <div class="body">
+          <div class="results">
+            <div class="kpi">
+              <div class="label">부피 (㎤) / 구간</div>
+              <div class="value" id="volKpi">-</div>
+              <div class="muted" id="volBand"></div>
+            </div>
+            <div class="kpi">
+              <div class="label">무게 (kg) / 구간</div>
+              <div class="value" id="kgKpi">-</div>
+              <div class="muted" id="kgBand"></div>
+            </div>
+          </div>
+
+          <table class="table" style="margin-top:14px;width:100%">
+            <thead>
+              <tr>
+                <th>구분</th>
+                <th>택배</th>
+                <th>정기화물</th>
+                <th>비고</th>
+              </tr>
+            </thead>
+          </table>
+          <div class="row" style="margin-top:6px">
+            <div><strong>A. 부피 기준</strong></div>
+            <div id="aParcel">-</div>
+            <div id="aCargo">-</div>
+            <div class="muted">택배는 거리% 적용</div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div><strong>B. 무게 기준</strong></div>
+            <div id="bParcel">-</div>
+            <div id="bCargo">-</div>
+            <div class="muted">택배는 거리% 적용</div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div><strong>최종 적용(최대값)</strong></div>
+            <div id="finalParcel" class="ok">-</div>
+            <div id="finalCargo" class="ok">-</div>
+            <div class="muted">A/B 중 더 높은 값</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ▼ 요금표 · 가산율 요약 (보기 쉽게, 하단 고정 섹션) -->
+    <section class="sheet">
+      <details open>
+        <summary>📑 부피 기준 요금표(요약)</summary>
+        <div class="scroll">
+          <table class="rate">
+            <thead>
+              <tr><th>구간(㎤ 상한)</th><th>택배(원)</th><th>정기화물(원)</th></tr>
+            </thead>
+            <tbody id="volTable"></tbody>
+          </table>
+        </div>
+      </details>
+      <details>
+        <summary>⚖ 무게 기준 요금표(요약)</summary>
+        <div class="scroll">
+          <table class="rate">
+            <thead>
+              <tr><th>구간(kg 상한)</th><th>택배(원)</th><th>정기화물(원)</th></tr>
+            </thead>
+            <tbody id="kgTable"></tbody>
+          </table>
+        </div>
+      </details>
+      <details>
+        <summary>🧭 권역별 거리 가산(간편 예시)</summary>
+        <div class="scroll">
+          <table class="rate">
+            <thead>
+              <tr><th>노선(예시)</th><th>가산율</th><th>비고</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>수도권↔수도권</td><td style="text-align:right">0%</td><td>기본 요금</td></tr>
+              <tr><td>수도권↔강원(일부)</td><td>10~15%</td><td>지점별 상이</td></tr>
+              <tr><td>수도권↔전라(일부)</td><td>20%</td><td>지점별 상이</td></tr>
+              <tr><td>수도권↔경상</td><td>25%</td><td>예: 서울→부산/경남</td></tr>
+              <tr><td>제주</td><td>별도</td><td>해상/항공료 별도</td></tr>
+            </tbody>
+          </table>
+          <p class="muted" style="margin:8px 2px 0">※ 정확한 도시간 가산율은 계약/지점 엑셀 기준으로 갱신 필요</p>
+        </div>
+      </details>
+    </section>
+
+    <footer>
+      ※ 반올림 규칙은 100원 단위 반올림을 기본 적용합니다. 계약 조건에 따라 달라질 수 있습니다.
+    </footer>
+  </div>
+
+  <script>
+    // === 요금표(요약) ===
+    const volumeBands = [
+      [20000, 3000, 1600], [30000, 3500, 2000], [40000, 4000, 2400], [50000, 4500, 2800], [60000, 5000, 3500],
+      [70000, 5500, 3800], [80000, 5500, 3800], [90000, 6000, 4200], [100000, 6500, 4500], [110000, 6500, 4500],
+      [120000, 7000, 4900], [130000, 7500, 5000], [140000, 8100, 5300], [150000, 8700, 5700], [160000, 9300, 6100]
+    ];
+    const weightBands = [
+      [6, 3000, 1600], [7, 3400, 1900], [8, 3800, 2200], [9, 4200, 2500], [10, 4500, 2800],
+      [20, 6000, 4200], [30, 9000, 6300], [40, 12000, 8400], [50, 15000, 10500], [60, 15000, 10500],
+      [70, 15200, 10500], [80, 17100, 10600], [90, 18600, 11500], [100, 20300, 12500]
+    ];
+
+    const round100 = (v) => Math.round(v / 100) * 100;
+    const fmt = (n)=> n==null||isNaN(n)?'-': n.toLocaleString('ko-KR')+'원';
+
+    function findBand(value, bands){
+      for(const [limit, p, c] of bands){ if(value <= limit) return {limit, parcel:p, cargo:c}; }
+      const last = bands[bands.length-1];
+      return {limit:last[0], parcel:last[1], cargo:last[2]};
+    }
+
+    function populateTables(){
+      const volT = document.getElementById('volTable');
+      const kgT = document.getElementById('kgTable');
+      volT.innerHTML = volumeBands.map(([lim,p,c])=>`<tr><td>${lim.toLocaleString('ko-KR')}</td><td>${p.toLocaleString('ko-KR')}</td><td>${c.toLocaleString('ko-KR')}</td></tr>`).join('');
+      kgT.innerHTML = weightBands.map(([lim,p,c])=>`<tr><td>${lim}</td><td>${p.toLocaleString('ko-KR')}</td><td>${c.toLocaleString('ko-KR')}</td></tr>`).join('');
+    }
+
+    function calc(){
+      const w = parseFloat(document.getElementById('w').value||0);
+      const l = parseFloat(document.getElementById('l').value||0);
+      const h = parseFloat(document.getElementById('h').value||0);
+      const kg = parseFloat(document.getElementById('kg').value||0);
+      const easy = document.getElementById('easy').checked;
+      let dist = parseFloat(document.getElementById('dist').value||0);
+
+      if(easy){
+        const r = document.getElementById('route').value;
+        if(r === 'JEJU'){
+          alert('제주는 해상/항공 별도 요율입니다. 지점 계약표를 반영하세요.');
+          dist = 0;
+        } else if(r){
+          dist = parseFloat(r);
+        }
+      }
+
+      const vol = w*l*h; // ㎤
+      const volBand = findBand(vol, volumeBands);
+      const kgBand  = findBand(kg, weightBands);
+
+      // 택배는 거리 가산 적용
+      const aParcel = round100(volBand.parcel * (1 + dist/100));
+      const bParcel = round100(kgBand.parcel * (1 + dist/100));
+
+      // 정기화물: 예시상 가산 미적용
+      const aCargo = volBand.cargo;
+      const bCargo = kgBand.cargo;
+
+      const finalParcel = Math.max(aParcel, bParcel);
+      const finalCargo  = Math.max(aCargo, bCargo);
+
+      // KPI
+      document.getElementById('volKpi').textContent = vol? (vol.toLocaleString('ko-KR') + ' ㎤') : '-';
+      document.getElementById('kgKpi').textContent  = kg? (kg.toLocaleString('ko-KR') + ' kg') : '-';
+      document.getElementById('volBand').textContent = vol? `밴드 상한: ${volBand.limit.toLocaleString('ko-KR')}㎤ · 기본택배 ${volBand.parcel.toLocaleString('ko-KR')}원 / 정기 ${volBand.cargo.toLocaleString('ko-KR')}원` : '';
+      document.getElementById('kgBand').textContent  = kg? `밴드 상한: ${kgBand.limit}kg · 기본택배 ${kgBand.parcel.toLocaleString('ko-KR')}원 / 정기 ${kgBand.cargo.toLocaleString('ko-KR')}원` : '';
+
+      // 표
+      document.getElementById('aParcel').textContent = fmt(aParcel);
+      document.getElementById('aCargo').textContent  = fmt(aCargo);
+      document.getElementById('bParcel').textContent = fmt(bParcel);
+      document.getElementById('bCargo').textContent  = fmt(bCargo);
+      document.getElementById('finalParcel').textContent = fmt(finalParcel);
+      document.getElementById('finalCargo').textContent  = fmt(finalCargo);
+
+      // 대형화물 태그
+      const sumEdge = w + l + h;
+      toggleTag('t1', Math.max(w,l,h) >= 100);
+      toggleTag('t2', sumEdge >= 160);
+      toggleTag('t3', kg >= 25);
+    }
+
+    function toggleTag(id, on){
+      const el = document.getElementById(id);
+      el.classList.remove('ok');
+      if(on) el.classList.add('ok');
+    }
+
+    // 간편 모드 토글
+    document.getElementById('easy').addEventListener('change', (e)=>{
+      const on = e.target.checked;
+      document.getElementById('routeWrap').style.display = on? 'block':'none';
+      document.getElementById('distWrap').style.display  = on? 'none':'block';
+    });
+
+    document.getElementById('calcBtn').addEventListener('click', calc);
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      for(const id of ['w','l','h','kg','dist']) document.getElementById(id).value='';
+      document.getElementById('route').value='';
+      for(const id of ['volKpi','kgKpi','volBand','kgBand','aParcel','aCargo','bParcel','bCargo','finalParcel','finalCargo'])
+        document.getElementById(id).textContent='-';
+      ['t1','t2','t3'].forEach(i=>document.getElementById(i).classList.remove('ok'));
+    });
+
+    // 데모 값 세팅
+    function demo(){
+      document.getElementById('w').value = 40;
+      document.getElementById('l').value = 40;
+      document.getElementById('h').value = 40;
+      document.getElementById('kg').value = 60;
+      document.getElementById('dist').value = 25;
+      populateTables();
+      calc();
+    }
+    demo();
+  </script>
+</body>
+</html>
